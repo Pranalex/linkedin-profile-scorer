@@ -1,0 +1,39 @@
+# Environment files
+.env
+*.env.local
+
+# Database data
+*.sql.backup
+pgdata/
+
+# n8n data
+n8n-data/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node modules (if using any)
+node_modules/
+
+# Python cache (if using any)
+__pycache__/
+*.pyc
+
+# Temporary files
+*.tmp
+*.temp
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker volumes
+postgres_data/
+n8n_data/
