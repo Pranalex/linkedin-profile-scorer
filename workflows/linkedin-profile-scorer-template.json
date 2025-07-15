@@ -1,0 +1,285 @@
+{
+  "name": "LinkedIn-profile-scorer",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "analyse-profile",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [140, 100],
+      "id": "REPLACE_WITH_YOUR_ID",
+      "name": "analyse-profile",
+      "webhookId": "REPLACE_WITH_YOUR_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "url": "= {{ $json.body.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "en-US,en;q=0.5"
+            },
+            {
+              "name": "Accept-Encoding",
+              "value": "gzip, deflate, br"
+            },
+            {
+              "name": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "name": "Upgrade-Insecure-Requests",
+              "value": "1"
+            },
+            {
+              "name": "Referer",
+              "value": "https://www.linkedin.com/"
+            },
+            {
+              "name": "Sec-Fetch-Dest",
+              "value": "document"
+            },
+            {
+              "name": "Sec-Fetch-Mode",
+              "value": "navigate"
+            },
+            {
+              "name": "Sec-Fetch-Site",
+              "value": "cross-site"
+            },
+            {
+              "name": "Sec-Fetch-User",
+              "value": "?1"
+            },
+            {
+              "name": "Cache-Control",
+              "value": "max-age=0"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, -200],
+      "id": "REPLACE_WITH_YOUR_ID",
+      "name": "HTTP Request",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// See scoring/linkedin_profile_scorer.js for complete implementation\n// Preliminary scoring and LLM prompt generation\nconst profileData = $input.first().json;\n\n// Complete scoring implementation available in repository\n// This is a template - refer to documentation for full code\n\nreturn [{\n  json: {\n    // Template - implement actual scoring logic\n    linkedin_url: profileData.url,\n    full_name: 'EXTRACTED_NAME',\n    total_score: 0,\n    llm_prompt: 'GENERATED_PROMPT_FOR_AI'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [380, -120],
+      "id": "REPLACE_WITH_YOUR_ID",
+      "name": "Score Code"
+    },
+    {
+      "parameters": {
+        "model": "gemini-2.5-flash",
+        "prompt": "={{ $json.llm_prompt }}",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "n8n-nodes-base.googleGemini",
+      "typeVersion": 1,
+      "position": [600, -120],
+      "id": "REPLACE_WITH_YOUR_ID",
+      "name": "Google Gemini",
+      "credentials": {
+        "googleGeminiApi": {
+          "id": "YOUR_GEMINI_CREDENTIAL_ID",
+          "name": "Google Gemini API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// See scoring/enhanced_score_logic.js for complete implementation\n// Enhanced scoring with AI integration\nconst geminiResponse = $('Google Gemini').first().json;\nconst originalData = $('Score Code').first().json;\n\n// Complete enhanced scoring implementation available in repository\n// This is a template - refer to documentation for full code\n\nreturn [{\n  json: {\n    // Template - implement actual enhanced scoring\n    linkedin_url: originalData.linkedin_url,\n    total_score: 0,\n    qualification_level: 'good',\n    llm_analysis_status: 'success'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [820, -120],
+      "id": "REPLACE_WITH_YOUR_ID",
+      "name": "Enhanced Score Code"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- PostgreSQL upsert query\n-- See database/postgresql-schema.sql for complete schema\nINSERT INTO profiles (\n  linkedin_url, full_name, total_score, qualification_level\n) VALUES (\n  '{{ $json.linkedin_url }}',\n  '{{ $json.full_name }}',\n  {{ $json.total_score }},\n  '{{ $json.qualification_level }}'\n)\nON CONFLICT (linkedin_url) \nDO UPDATE SET\n  total_score = EXCLUDED.total_score,\n  updated_at = CURRENT_TIMESTAMP;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1040, -120],
+      "id": "REPLACE_WITH_YOUR_ID",
+      "name": "PostgreSQL Storage",
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_DATABASE_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Profiles Database"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Full Name|title",
+              "title": "={{ $json.full_name }}"
+            },
+            {
+              "key": "LinkedIn URL|url",
+              "urlValue": "={{ $json.linkedin_url }}"
+            },
+            {
+              "key": "Total Score|number",
+              "numberValue": "={{ $json.total_score }}"
+            },
+            {
+              "key": "Qualification Level|select",
+              "selectValue": "={{ $json.qualification_level }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1260, -120],
+      "id": "REPLACE_WITH_YOUR_ID",
+      "name": "Notion Storage",
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CREDENTIAL_ID",
+          "name": "Notion API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [1480, -120],
+      "id": "REPLACE_WITH_YOUR_ID",
+      "name": "Response"
+    }
+  ],
+  "connections": {
+    "analyse-profile": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Score Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Code": {
+      "main": [
+        [
+          {
+            "node": "Google Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini": {
+      "main": [
+        [
+          {
+            "node": "Enhanced Score Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Score Code": {
+      "main": [
+        [
+          {
+            "node": "PostgreSQL Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PostgreSQL Storage": {
+      "main": [
+        [
+          {
+            "node": "Notion Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion Storage": {
+      "main": [
+        [
+          {
+            "node": "Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "id": "TEMPLATE_WORKFLOW",
+  "tags": []
+}
