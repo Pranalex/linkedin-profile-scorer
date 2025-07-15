@@ -1,6 +1,6 @@
 # 🎯 LinkedIn Profile Scorer
 
-AI-powered LinkedIn profile analysis and scoring system with comprehensive monitoring and error handling.
+AI-powered LinkedIn profile analysis and scoring system using n8n automation, PostgreSQL, and Notion integration.
 
 ## 🚀 Quick Start
 

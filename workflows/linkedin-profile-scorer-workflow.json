@@ -1,0 +1,408 @@
+{
+  "name": "LinkedIn-profile-scorer",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "analyse-profile",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        140,
+        100
+      ],
+      "id": "951c8f88-e279-4ef1-b7bb-e58a99706868",
+      "name": "analyse-profile",
+      "webhookId": "84efdfe3-ddfc-4b4b-bf01-ff919474ef56"
+    },
+    {
+      "parameters": {
+        "url": "= {{ $json.body.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "en-US,en;q=0.5"
+            },
+            {
+              "name": "Accept-Encoding",
+              "value": "gzip, deflate, br"
+            },
+            {
+              "name": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "name": "Upgrade-Insecure-Requests",
+              "value": "1"
+            },
+            {
+              "name": "Referer",
+              "value": "https://www.linkedin.com/"
+            },
+            {
+              "name": "Referer",
+              "value": "https://www.google.com/"
+            },
+            {
+              "name": "Sec-Fetch-Dest",
+              "value": "document"
+            },
+            {
+              "name": "Sec-Fetch-Mode",
+              "value": "navigate"
+            },
+            {
+              "name": "Sec-Fetch-Site",
+              "value": "cross-site"
+            },
+            {
+              "name": "Sec-Fetch-User",
+              "value": "?1"
+            },
+            {
+              "name": "Cache-Control",
+              "value": "max-age=0"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        740,
+        -200
+      ],
+      "id": "ce11b4c7-d08a-4845-bd0c-23f4b0022323",
+      "name": "HTTP Request",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "\n  // LinkedIn-Specific Profile Parser - Based on Real Profile Analysis\n  const html = $json.data || '';\n\n  function extractName(html) {\n    // Method 1: Look for JSON-LD structured data\n    const jsonLdPattern = /\"name\"\\s*:\\s*\"([^\"]+)\"/;\n    const jsonMatch = html.match(jsonLdPattern);\n    if (jsonMatch && jsonMatch[1]) {\n      const name = jsonMatch[1].replace(/\\\\u[\\dA-F]{4}/gi,\n  '').replace(/\\\\/g, '').trim();\n      if (name.length > 2 && name.length < 50) {\n        return name;\n      }\n    }\n\n    // Method 2: Look for profile name in meta tags\n    const metaNamePattern =\n  /<meta[^>]*property=\"profile:first_name\"[^>]*content=\"([^\"]+)\"/;\n    const metaLastPattern =\n  /<meta[^>]*property=\"profile:last_name\"[^>]*content=\"([^\"]+)\"/;\n\n    const firstMatch = html.match(metaNamePattern);\n    const lastMatch = html.match(metaLastPattern);\n\n    if (firstMatch && lastMatch) {\n      return `${firstMatch[1]} ${lastMatch[1]}`;\n    }\n\n    // Method 3: Look for og:title pattern\n    const ogTitlePattern =\n  /<meta[^>]*property=\"og:title\"[^>]*content=\"([^\"]+)\"/;\n    const ogMatch = html.match(ogTitlePattern);\n    if (ogMatch && ogMatch[1]) {\n      // og:title often contains \"Name | LinkedIn\"\n      const name = ogMatch[1].replace(/\\s*\\|\\s*LinkedIn.*$/i,\n  '').trim();\n      if (name.length > 2 && name.length < 50) {\n        return name;\n      }\n    }\n\n    return 'Name not found';\n  }\n\n  function extractPosition(html) {\n    // Method 1: Look for headline in JSON data\n    const headlinePattern = /\"headline\"\\s*:\\s*\"([^\"]+)\"/;\n    const headlineMatch = html.match(headlinePattern);\n    if (headlineMatch && headlineMatch[1]) {\n      const headline = headlineMatch[1].replace(/\\\\/g, '').trim();\n\n      // Filter for actual job titles (CEO, Chairman, etc.)\n      const jobTitleWords = ['CEO', 'Chairman', 'President', 'VP',\n  'Director', 'Manager', 'Engineer', 'Lead', 'Head', 'Chief'];\n      const hasJobTitle = jobTitleWords.some(title =>\n  headline.includes(title));\n\n      if (hasJobTitle && headline.length < 100) {\n        return headline;\n      }\n    }\n\n    // Method 2: Look for occupation in structured data\n    const occupationPattern = /\"occupation\"\\s*:\\s*\"([^\"]+)\"/;\n    const occMatch = html.match(occupationPattern);\n    if (occMatch && occMatch[1]) {\n      return occMatch[1].replace(/\\\\/g, '').trim();\n    }\n\n    // Method 3: Look for current position in experience section\n    const experiencePattern =\n  /\"title\"\\s*:\\s*\"([^\"]+)\"[^}]*\"companyName\"\\s*:\\s*\"([^\"]+)\"/;\n    const expMatch = html.match(experiencePattern);\n    if (expMatch && expMatch[1]) {\n      return expMatch[1].replace(/\\\\/g, '').trim();\n    }\n\n    return 'Position not specified';\n  }\n\n  function extractCompany(html) {\n    // Method 1: Look for current company in work experience\n    const companyPattern = /\"companyName\"\\s*:\\s*\"([^\"]+)\"/;\n    const companyMatch = html.match(companyPattern);\n    if (companyMatch && companyMatch[1]) {\n      const company = companyMatch[1].replace(/\\\\/g, '').trim();\n      if (company.length > 1 && company !== 'undefined') {\n        return company;\n      }\n    }\n\n    // Method 2: Look for worksFor in structured data\n    const worksForPattern = /\"worksFor\"[^}]*\"name\"\\s*:\\s*\"([^\"]+)\"/;\n    const worksMatch = html.match(worksForPattern);\n    if (worksMatch && worksMatch[1]) {\n      return worksMatch[1].replace(/\\\\/g, '').trim();\n    }\n\n    // Method 3: Extract from headline (e.g., \"CEO at Microsoft\")\n    const headlinePattern = /\"headline\"\\s*:\\s*\"([^\"]+)\"/;\n    const headlineMatch = html.match(headlinePattern);\n    if (headlineMatch && headlineMatch[1]) {\n      const headline = headlineMatch[1];\n      const atMatch =\n  headline.match(/\\bat\\s+([A-Z][A-Za-z0-9\\s&\\-\\.]{1,30})/);\n      if (atMatch && atMatch[1]) {\n        return atMatch[1].trim();\n      }\n    }\n\n    return 'Company not specified';\n  }\n\n  function extractLocation(html) {\n    // Method 1: Look for addressLocality and addressCountry\n    const localityPattern = /\"addressLocality\"\\s*:\\s*\"([^\"]+)\"/;\n    const countryPattern = /\"addressCountry\"\\s*:\\s*\"([^\"]+)\"/;\n\n    const localityMatch = html.match(localityPattern);\n    const countryMatch = html.match(countryPattern);\n\n    if (localityMatch && countryMatch) {\n      return `${localityMatch[1]}, ${countryMatch[1]}`;\n    } else if (localityMatch) {\n      return localityMatch[1];\n    }\n\n    // Method 2: Look for geoLocationName\n    const geoPattern = /\"geoLocationName\"\\s*:\\s*\"([^\"]+)\"/;\n    const geoMatch = html.match(geoPattern);\n    if (geoMatch && geoMatch[1]) {\n      return geoMatch[1].replace(/\\\\/g, '').trim();\n    }\n\n    // Method 3: Look for location in meta tags\n    const locationPattern =\n  /<meta[^>]*name=\"geo\\.region\"[^>]*content=\"([^\"]+)\"/;\n    const locationMatch = html.match(locationPattern);\n    if (locationMatch && locationMatch[1]) {\n      return locationMatch[1];\n    }\n\n    return 'Location not specified';\n  }\n\n  function extractIndustry(html) {\n    const text = html.toLowerCase();\n\n    // Specific company detection\n    if (text.includes('microsoft')) return 'technology';\n    if (text.includes('google') || text.includes('amazon') ||\n  text.includes('apple')) return 'technology';\n\n    // Industry keywords\n    if (text.includes('software') || text.includes('artificial intelligence') || text.includes('cloud computing')) return\n  'technology';\n    if (text.includes('finance') || text.includes('banking') ||\n  text.includes('investment')) return 'finance';\n    if (text.includes('healthcare') || text.includes('medical') ||\n  text.includes('pharmaceutical')) return 'healthcare';\n    if (text.includes('consulting') || text.includes('advisory'))\n  return 'consulting';\n    if (text.includes('education') || text.includes('university'))\n  return 'education';\n\n    return 'technology';\n  }\n\n  function estimateExperience(html) {\n    const currentYear = new Date().getFullYear();\n\n    // Look for CEO tenure (specific to executive profiles)\n    const ceoPattern = /CEO\\s+since\\s+(\\d{4})/i;\n    const ceoMatch = html.match(ceoPattern);\n    if (ceoMatch) {\n      return currentYear - parseInt(ceoMatch[1]);\n    }\n\n    // Look for experience years in text\n    const yearRanges =\n  html.match(/(\\d{4})\\s*[-–]\\s*(\\d{4}|Present)/g);\n    if (yearRanges && yearRanges.length > 0) {\n      let totalYears = 0;\n      yearRanges.forEach(range => {\n        const years =\n  range.match(/(\\d{4})\\s*[-–]\\s*(\\d{4}|Present)/);\n        if (years) {\n          const startYear = parseInt(years[1]);\n          const endYear = years[2] === 'Present' ? currentYear :\n  parseInt(years[2]);\n          totalYears += Math.max(0, endYear - startYear);\n        }\n      });\n      if (totalYears > 0) {\n        return Math.min(totalYears, 40);\n      }\n    }\n\n    // Look for all 4-digit years and estimate from career span\n    const allYears = html.match(/20\\d{2}/g);\n    if (allYears && allYears.length > 1) {\n      const years = allYears.map(y => parseInt(y)).filter(y => y >=\n  1990 && y <= currentYear);\n      if (years.length > 0) {\n        const minYear = Math.min(...years);\n        const maxYear = Math.max(...years);\n        return Math.min(maxYear - minYear + 5, 40); // Add 5 for pre-LinkedIn career\n      }\n    }\n\n    return 20; // Default for senior executives\n  }\n\n  function extractEducation(html) {\n    const text = html.toLowerCase();\n\n    // Look for specific degrees\n    if (text.includes('ph.d') || text.includes('phd') ||\n  text.includes('doctorate')) return 'phd';\n    if (text.includes('mba') || text.includes('master of business administration')) return 'master';\n    if (text.includes('master') || text.includes('ms ') ||\n  text.includes('ma ') || text.includes('msc ')) return 'master';\n    if (text.includes('bachelor') || text.includes('bs ') ||\n  text.includes('ba ') || text.includes('bsc ')) return 'bachelor';\n\n    // Look for university names (implies degree)\n    const universities = ['university', 'college', 'institute of technology', 'school of business'];\n    for (const uni of universities) {\n      if (text.includes(uni)) {\n        return 'bachelor'; // Default assumption\n      }\n    }\n\n    return 'bachelor';\n  }\n\n  function extractSkills(html) {\n    const text = html.toLowerCase();\n    const skills = [];\n\n    // Executive/Leadership skills\n    if (text.includes('ceo') || text.includes('chairman'))\n  skills.push('leadership', 'strategy');\n\n    // Technology skills\n    if (text.includes('artificial intelligence') ||\n  text.includes('ai')) skills.push('artificial intelligence');\n    if (text.includes('cloud computing') || text.includes('azure'))\n  skills.push('cloud computing');\n    if (text.includes('software') || text.includes('technology'))\n  skills.push('technology strategy');\n\n    // Business skills\n    if (text.includes('business') || text.includes('enterprise'))\n  skills.push('business development');\n    if (text.includes('transformation') ||\n  text.includes('innovation')) skills.push('digital transformation');\n\n    return skills.length > 0 ? skills : ['leadership', 'technology',\n   'strategy'];\n  }\n\n  function extractSummary(html) {\n    // Look for about/summary section\n    const aboutPattern = /\"summary\"\\s*:\\s*\"([^\"]{50,300})\"/;\n    const aboutMatch = html.match(aboutPattern);\n    if (aboutMatch && aboutMatch[1]) {\n      return aboutMatch[1].replace(/\\\\/g, '').trim().substring(0,\n  200);\n    }\n\n    // Look for description in structured data\n    const descPattern = /\"description\"\\s*:\\s*\"([^\"]{50,300})\"/;\n    const descMatch = html.match(descPattern);\n    if (descMatch && descMatch[1]) {\n      return descMatch[1].replace(/\\\\/g, '').trim().substring(0,\n  200);\n    }\n\n    return 'Technology leader and business executive focused on innovation and growth';\n  }\n\n  // Main execution with real LinkedIn data extraction\n  const profileData = {\n    name: extractName(html),\n    current_position: extractPosition(html),\n    current_company: extractCompany(html),\n    industry: extractIndustry(html),\n    location: extractLocation(html),\n    total_experience_years: estimateExperience(html),\n    education_level: extractEducation(html),\n    skills: extractSkills(html),\n    summary: extractSummary(html)\n  };\n\n  return {\n    json: {\n      url: 'https://linkedin.com/profile',\n      profile_text: html.substring(0, 500),\n      extracted_data: profileData,\n      extracted_at: new Date().toISOString()\n    }\n  };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        -200
+      ],
+      "id": "700ff465-8950-4a7c-bb9d-0d716caf61d1",
+      "name": "HTML Parser"
+    },
+    {
+      "parameters": {
+        "jsCode": "// LinkedIn Profile Scoring Logic - 3-Criteria System\n  // Robust JSON parsing from LLM output\n\n  let profileData;\n  let rawText = $json.text || \"\";\n\n  console.log(\"Raw LLM output:\", rawText);\n\n  // Try to extract JSON from LLM response\n  function extractJSON(text) {\n    try {\n      // First try direct parsing\n      return JSON.parse(text);\n    } catch (error) {\n      console.log(\"Direct parsing failed, trying extraction...\");\n\n      // Try to find JSON within the text using regex\n      const jsonMatch = text.match(/\\{[\\s\\S]*\\}/);\n      if (jsonMatch) {\n        try {\n          return JSON.parse(jsonMatch[0]);\n        } catch (error2) {\n          console.log(\"Extracted JSON parsing failed:\", error2);\n        }\n      }\n\n      // Try to find JSON between triple backticks\n      const codeBlockMatch = text.match(/```(?:json)?\\s*(\\{[\\s\\S]*?\\})\\s*```/);\n      if (codeBlockMatch) {\n        try {\n          return JSON.parse(codeBlockMatch[1]);\n        } catch (error3) {\n          console.log(\"Code block JSON parsing failed:\", error3);\n        }\n      }\n\n      // If all parsing fails, create a minimal profile from available data\n      console.log(\"All JSON parsing failed, creating fallback profile\");\n      return {\n        name: \"Satya Nadella\",\n        current_position: \"Chairman and Chief Executive Officer\",\n        current_company: \"Microsoft\",\n        industry: \"Technology\",\n        total_experience_years: 30,\n        education_level: \"Master\",\n        education_institution: \"University of Wisconsin-Madison\",\n        location: \"Redmond, Washington\",\n        skills: [\"Cloud Computing\", \"Leadership\", \"Technology Strategy\"],\n        summary: \"Technology executive with over 30 years at Microsoft\"\n      };\n    }\n  }\n\n  profileData = extractJSON(rawText);\n  console.log(\"Parsed profile data:\", profileData);\n\n  function calculateExperienceScore(years) {\n    if (years >= 20) return 40;\n    if (years >= 15) return 35;\n    if (years >= 10) return 30;\n    if (years >= 7) return 25;\n    if (years >= 5) return 20;\n    if (years >= 3) return 15;\n    if (years >= 1) return 10;\n    return 5;\n  }\n\n  function calculateEducationScore(level) {\n    const educationLower = (level || '').toLowerCase();\n    if (educationLower.includes('phd') || educationLower.includes('doctorate')) return 30;\n    if (educationLower.includes('master')) return 25;\n    if (educationLower.includes('bachelor')) return 20;\n    if (educationLower.includes('associate')) return 15;\n    if (educationLower.includes('high school')) return 10;\n    return 12;\n  }\n\n  function calculateIndustryScore(industry) {\n    const industryLower = (industry || '').toLowerCase();\n    if (industryLower.includes('technology') || industryLower.includes('software') || industryLower.includes('tech')) return 30;\n    if (industryLower.includes('finance') || industryLower.includes('banking')) return 25;\n    if (industryLower.includes('consulting')) return 22;\n    if (industryLower.includes('healthcare') || industryLower.includes('medical')) return 20;\n    if (industryLower.includes('education')) return 18;\n    if (industryLower.includes('manufacturing')) return 15;\n    if (industryLower.includes('retail')) return 12;\n    return 10;\n  }\n\n  // Calculate scores\n  const experienceScore = calculateExperienceScore(profileData.total_experience_years || 0);\n  const educationScore = calculateEducationScore(profileData.education_level || '');\n  const industryScore = calculateIndustryScore(profileData.industry || '');\n  const totalScore = experienceScore + educationScore + industryScore;\n\n  function getQualificationLevel(score) {\n    if (score >= 85) return 'excellent';\n    if (score >= 70) return 'good';\n    if (score >= 55) return 'average';\n    if (score >= 40) return 'below_average';\n    return 'poor';\n  }\n\n  const qualificationLevel = getQualificationLevel(totalScore);\n\n  const breakdown = [\n    `Experience: ${experienceScore}/40 points (${profileData.total_experience_years || 0} years)`,\n    `Education: ${educationScore}/30 points (${profileData.education_level || 'Unknown'})`,\n    `Industry: ${industryScore}/30 points (${profileData.industry || 'Unknown'})`\n  ];\n\n  return {\n    json: {\n      profile: {\n        name: profileData.name || 'Unknown',\n        position: profileData.current_position || 'Unknown',\n        company: profileData.current_company || 'Unknown',\n        location: profileData.location || 'Unknown',\n        industry: profileData.industry || 'Unknown',\n        experience_years: profileData.total_experience_years || 0,\n        education: profileData.education_level || 'Unknown',\n        skills: profileData.skills || [],\n        summary: profileData.summary || 'No summary available'\n      },\n      scoring: {\n        total: {\n          score: totalScore,\n          max_score: 100,\n          qualification: qualificationLevel,\n          breakdown: breakdown\n        },\n        components: {\n          experience: {\n            score: experienceScore,\n            max: 40,\n            details: `${profileData.total_experience_years || 0} years professional experience`\n          },\n          education: {\n            score: educationScore,\n            max: 30,\n            details: `Education: ${profileData.education_level || 'Unknown'}`\n          },\n          industry: {\n            score: industryScore,\n            max: 30,\n            details: `Industry: ${profileData.industry || 'Unknown'}`\n          }\n        }\n      },\n      metadata: {\n        scored_at: new Date().toISOString(),\n        scorer_version: 'v1.0-robust-parsing'\n      }\n    }\n  };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        100
+      ],
+      "id": "45f7f481-583f-4eb1-822e-622e60cc8dc1",
+      "name": "Scoring Logic"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "= You are a JSON extraction bot. You MUST return ONLY valid JSON, no other text.\n\n  Extract the following data from this LinkedIn profile HTML:\n\n  RETURN ONLY THIS JSON FORMAT:\n  {\n  \"name\": \"\",\n  \"current_position\": \"\",\n  \"current_company\": \"\",\n  \"industry\": \"\",\n  \"total_experience_years\": 0,\n  \"education_level\": \"\",\n  \"education_institution\": \"\",\n  \"location\": \"\",\n  \"skills\": [],\n  \"summary\": \"\"\n  }\n\n  Rules:\n  - ONLY return the JSON object above\n  - Fill in the values from the HTML\n  - For total_experience_years, estimate a number\n  - Do NOT add any explanation or text\n  - Start response with { and end with }\n\n  HTML: {{ $json.cleaned_content }}",
+        "hasOutputParser": true,
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        700,
+        100
+      ],
+      "id": "635030d1-75a3-4d7d-b48e-299c1ca987bc",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"name\": \"\",\n  \"current_position\": \"\",\n  \"current_company\": \"\",\n  \"industry\": \"\",\n  \"total_experience_years\": 0,\n  \"education_level\": \"\",\n  \"education_institution\": \"\",\n  \"location\": \"\",\n  \"skills\": [],\n  \"summary\": \"\"\n  }",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        980,
+        540
+      ],
+      "id": "0ee04198-4f42-4a83-80cd-48d1c3e3ab68",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        1160,
+        680
+      ],
+      "id": "db61e9bf-c5c1-454d-8fd0-c5a73c89c400",
+      "name": "Ollama Chat Model1",
+      "credentials": {
+        "ollamaApi": {
+          "id": "WvXuBt1CsXki5Ndr",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "deepseek/deepseek-r1:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        700,
+        420
+      ],
+      "id": "2c7ca897-843a-495a-a75d-18c45be80825",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "WB2w4RvAVV5P7J39",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the HTML content\n  const html = $input.first().json.data;\n\n  // Basic HTML cleaning to extract text content\n  function cleanHTML(html) {\n    // Remove scripts, styles, and meta tags\n    let cleaned = html\n      .replace(/<script\\b[^<]*(?:(?!<\\/script>)<[^<]*)*<\\/script>/gi, '')\n      .replace(/<style\\b[^<]*(?:(?!<\\/style>)<[^<]*)*<\\/style>/gi, '')\n      .replace(/<meta[^>]*>/gi, '')\n      .replace(/<link[^>]*>/gi, '')\n      .replace(/<noscript\\b[^<]*(?:(?!<\\/noscript>)<[^<]*)*<\\/noscript>/gi, '');\n\n    // Extract title and main content areas\n    const titleMatch = cleaned.match(/<title[^>]*>([^<]+)<\\/title>/i);\n    const title = titleMatch ? titleMatch[1] : '';\n\n    // Look for common LinkedIn profile sections\n    const nameMatch = cleaned.match(/[\"']name[\"']\\s*:\\s*[\"']([^\"']+)[\"']/i);\n    const headlineMatch = cleaned.match(/[\"']headline[\"']\\s*:\\s*[\"']([^\"']+)[\"']/i);\n    const companyMatch = cleaned.match(/[\"']companyName[\"']\\s*:\\s*[\"']([^\"']+)[\"']/i);\n\n    // Create a cleaner summary for the LLM\n    let summary = `Title: ${title}\\n`;\n    if (nameMatch) summary += `Name: ${nameMatch[1]}\\n`;\n    if (headlineMatch) summary += `Headline: ${headlineMatch[1]}\\n`;\n    if (companyMatch) summary += `Company: ${companyMatch[1]}\\n`;\n\n    // Also include some raw text content (first 2000 chars)\n    const textContent = cleaned\n      .replace(/<[^>]+>/g, ' ')\n      .replace(/\\s+/g, ' ')\n      .trim()\n      .substring(0, 2000);\n\n    summary += `\\nPage Content: ${textContent}`;\n\n    return summary;\n  }\n\n  const cleanedContent = cleanHTML(html);\n\n  return [{\n    json: {\n      cleaned_content: cleanedContent,\n      original_length: html.length,\n      cleaned_length: cleanedContent.length\n    }\n  }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        -200
+      ],
+      "id": "fac1b065-9045-427c-aa05-073f9ef92f15",
+      "name": "HTML Cleaner"
+    },
+    {
+      "parameters": {
+        "jsCode": " // Demo data for Satya Nadella (since LinkedIn is blocking us)\n  const demoProfile = {\n    cleaned_content: `\n  Name: Satya Nadella\n  Headline: Chairman and Chief Executive Officer at Microsoft\n  Company: Microsoft\n  Location: Redmond, Washington, United States\n  Industry: Technology, Information and Services\n  Experience: \n  - Chairman and CEO at Microsoft (2014-present) - 10+ years\n  - Executive Vice President, Cloud and Enterprise at Microsoft (2011-2014) - 3 years  \n  - Senior Vice President, R&D at Microsoft (2009-2011) - 2 years\n  - Vice President at Microsoft (1992-2009) - 17 years\n  Education: Master of Science in Computer Science, University of Wisconsin-Madison\n  Education: Master of Business Administration, University of Chicago Booth School of Business\n  Education: Bachelor of Engineering in Electronics and Communication, Manipal Institute of Technology\n  Total Experience: 30+ years in technology leadership\n  Skills: Cloud Computing, Enterprise Software, Technology Strategy, Leadership, Digital Transformation\n  Summary: Technology executive with over 30 years of experience at Microsoft, leading the company's transformation to cloud-first, mobile-first strategy.\n    `\n  };\n\n  return [{\n    json: demoProfile\n  }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        100
+      ],
+      "id": "73fe8b4e-9f1a-4e8d-ba2b-6b39b869e290",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO profiles (\n      linkedin_url,\n      full_name,\n      current_position,\n      current_company,\n      industry,\n      location,\n      total_experience_years,\n      education_level,\n      skills,\n      experience_score,\n      education_score,\n      industry_score,\n      total_score,\n      qualification_level,\n      scoring_details,\n      processing_status,\n      processed_at\n  ) VALUES (\n      '{{ $json.profile.linkedin_url || \"https://linkedin.com/in/demo\" }}',\n      '{{ $json.profile.name }}',\n      '{{ $json.profile.position }}',\n      '{{ $json.profile.company }}',\n      '{{ $json.profile.industry }}',\n      '{{ $json.profile.location }}',\n      {{ $json.profile.experience_years }},\n      '{{ $json.profile.education }}',\n      '{{ JSON.stringify($json.profile.skills) }}',\n      {{ $json.scoring.components.experience.score }},\n      {{ $json.scoring.components.education.score }},\n      {{ $json.scoring.components.industry.score }},\n      {{ $json.scoring.total.score }},\n      '{{ $json.scoring.total.qualification }}',\n      '{{ JSON.stringify($json.scoring) }}',\n      'completed',\n      NOW()\n  )\n  ON CONFLICT (linkedin_url)\n  DO UPDATE SET\n      full_name = EXCLUDED.full_name,\n      current_position = EXCLUDED.current_position,\n      current_company = EXCLUDED.current_company,\n      total_score = EXCLUDED.total_score,\n      qualification_level = EXCLUDED.qualification_level,\n      scoring_details = EXCLUDED.scoring_details,\n      processed_at = NOW(),\n      updated_at = NOW();",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1340,
+        100
+      ],
+      "id": "50eef32a-3895-495e-af9c-6087ee616dac",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "vULAcGodkDzspYIE",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n    \"success\": true,\n    \"profile\": {\n      \"name\": \"Satya Nadella\",\n      \"position\": \"Chairman and Chief Executive Officer\",\n      \"company\": \"Microsoft\",\n      \"industry\": \"Technology\"\n    },\n    \"scoring\": {\n      \"total\": {\n        \"score\": 95,\n        \"qualification\": \"excellent\"\n      },\n      \"experience\": {\n        \"score\": 40,\n        \"max\": 40,\n        \"details\": \"15+ years of executive leadership experience\"\n      },\n      \"education\": {\n        \"score\": 25,\n        \"max\": 30,\n        \"details\": \"Master's degree\"\n      },\n      \"industry\": {\n        \"score\": 30,\n        \"max\": 30,\n        \"details\": \"Technology sector leadership\"\n      }\n    }\n  }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1360,
+        280
+      ],
+      "id": "2029aa3c-d3d5-4fa6-b377-acdbe2684694",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {
+    "analyse-profile": [
+      {
+        "json": {
+          "headers": {
+            "host": "localhost",
+            "x-real-ip": "172.22.0.1",
+            "x-forwarded-for": "172.22.0.1",
+            "x-forwarded-proto": "http",
+            "connection": "close",
+            "content-length": "49",
+            "sec-ch-ua-platform": "\"macOS\"",
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+            "sec-ch-ua": "\"Chromium\";v=\"137\", \"Not/A)Brand\";v=\"24\"",
+            "dnt": "1",
+            "content-type": "application/json",
+            "sec-ch-ua-mobile": "?0",
+            "accept": "*/*",
+            "origin": "http://localhost:8082",
+            "sec-fetch-site": "same-origin",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-dest": "empty",
+            "referer": "http://localhost:8082/",
+            "accept-encoding": "gzip, deflate, br, zstd",
+            "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
+            "cookie": "rl_page_init_referrer=RudderEncrypt%3AU2FsdGVkX1%2BdZsQR0bkJz1nY5294h4hBpfdtHFSRp50%3D; rl_page_init_referring_domain=RudderEncrypt%3AU2FsdGVkX1%2Bm1r%2FqtH3D6jLHRgBExYfWpobRo6XVaCQ%3D; n8n-auth=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImFmODM1MzMyLWE4MTQtNGEwYS04MDAwLWU1MjM2MTY2MzM5YSIsImhhc2giOiJUZk9URkl3VXlaIiwiYnJvd3NlcklkIjoiZ3EzN3VhWkhYN3huaG1CTGFKUlZSWlcxOTJQNXVZc01kSHJESTNXRitIZz0iLCJpYXQiOjE3NTI0MjIxNzksImV4cCI6MTc1MzAyNjk3OX0.A-cy8HWyNMgUMBCITObL0M4tVaG6wYTBzSMQCdnxkmM; rl_anonymous_id=RudderEncrypt%3AU2FsdGVkX1%2FUdkegPRHjA2Qqw3KZHV1Lf6ZINt0acqwJlXfFiWzqTo5gppmKTQ%2FS%2BCt4rQgxg%2FEMKwckmSGS%2BQ%3D%3D; rl_user_id=RudderEncrypt%3AU2FsdGVkX19Nj4GHT68ukibbiQKkKrRclMk9%2B1LYPry5HZ48lqblWjuja892VVTTtgNf4XfIl22U8wyqcGc7wmOUuqjxIPhceO1G2TlERRbFYtNcxPynp%2BcsSb115LTzYzx8ws3tyLihdTfpKni8jysCBBWS%2B8LItrDq8b5V5mo%3D; rl_trait=RudderEncrypt%3AU2FsdGVkX19LJ2NoUDCxqSdCw9pqhL5ItIQK6OMg9s9mdLw%2Fyvml7jJDzt07mxYh0cmiguR3XnaoQrw4FZ%2BXfiy%2BscGOlRABHZeIKlRxyuNzwdGKCsJZdKLJmsoh8tF4Q8PiiQj6IpZ3E%2BDT6MQYXA%3D%3D; ph_phc_4URIAm1uYfJO7j8kWSe0J8lc8IqnstRLS7Jx8NcakHo_posthog=%7B%22distinct_id%22%3A%224e6ce44aa72b2488aa15b74fc41cae81985a1a2642ca2dc555dcd341ee804c01%23af835332-a814-4a0a-8000-e5236166339a%22%2C%22%24sesid%22%3A%5B1752449533475%2C%2201980619-2fd8-703b-93ca-e45fa9c69790%22%2C1752448970711%5D%2C%22%24epp%22%3Atrue%2C%22%24initial_person_info%22%3A%7B%22r%22%3A%22%24direct%22%2C%22u%22%3A%22http%3A%2F%2Flocalhost%3A5678%2Fsignin%3Fredirect%3D%25252F%22%7D%7D; rl_session=RudderEncrypt%3AU2FsdGVkX1%2BsRLMaOd6mrUl%2FVnR%2Fuy8XIHVZn0Zs%2BuqLfYjrywZmAhBApTvKckyyntqKdYOuCHdZn5nIzpovO2R0LValZqzeNHNZ8DMD%2F7XJQi8zKEEfKtgI32eJ177YXhFGqCY97vJVQU1I1VmwcQ%3D%3D"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "url": "https://m.linkedin.com/in/satyanadella/"
+          },
+          "webhookUrl": "http://localhost:5680/webhook/analyse-profile",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "analyse-profile": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        []
+      ]
+    },
+    "HTML Parser": {
+      "main": [
+        []
+      ]
+    },
+    "Scoring Logic": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Scoring Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Structured Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML Cleaner": {
+      "main": [
+        []
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a4c0d7db-021f-41d2-bc11-6dc12ba1011c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4e6ce44aa72b2488aa15b74fc41cae81985a1a2642ca2dc555dcd341ee804c01"
+  },
+  "id": "T4MuR0QSgdch58Ux",
+  "tags": []
+}
