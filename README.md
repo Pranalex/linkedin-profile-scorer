@@ -374,10 +374,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- [n8n](https://n8n.io/) for workflow automation
-- [Grafana](https://grafana.com/) for monitoring dashboards
-- [Prometheus](https://prometheus.io/) for metrics collection
-- [PostgreSQL](https://postgresql.org/) for data storage
+- [n8n](https://n8n.io/) for workflow orchestration and automation
+- [Apify](https://apify.com/) for reliable LinkedIn profile scraping services
+- [Google AI](https://ai.google.dev/) for Gemini API and intelligent analysis capabilities
+- [PostgreSQL](https://postgresql.org/) for robust data storage and management
+- [Notion](https://notion.so/) for collaborative database and team workspace integration
 
 ---
 
