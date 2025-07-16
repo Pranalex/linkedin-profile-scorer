@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: linkedin_postgres_core
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_EXTERNAL_PORT:-5434}:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_core_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - linkedin_core_network
+
+  # n8n Workflow Automation
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: linkedin_n8n_core
+    restart: unless-stopped
+    ports:
+      - "${N8N_EXTERNAL_PORT:-5680}:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=${N8N_PORT}
+      - N8N_PROTOCOL=${N8N_PROTOCOL}
+      - N8N_LISTEN_ADDRESS=${N8N_HOST}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=${POSTGRES_HOST}
+      - DB_POSTGRESDB_PORT=${POSTGRES_PORT}
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_POSTGRESDB_SCHEMA=${DB_POSTGRESDB_SCHEMA}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+      - N8N_LOG_LEVEL=${N8N_LOG_LEVEL}
+      - N8N_DEFAULT_BINARY_DATA_MODE=${N8N_DEFAULT_BINARY_DATA_MODE}
+      - N8N_BINARY_DATA_TTL=${N8N_BINARY_DATA_TTL}
+      - N8N_BINARY_DATA_S3_REGION=${N8N_BINARY_DATA_S3_REGION}
+      - N8N_SESSION_TIMEOUT=${N8N_SESSION_TIMEOUT}
+      - N8N_JWT_SESSION_DURATION=${N8N_JWT_SESSION_DURATION}
+      - N8N_JWT_REFRESH_TIMEOUT=${N8N_JWT_REFRESH_TIMEOUT}
+      - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE}
+      - N8N_COOKIES_SECURE=${N8N_COOKIES_SECURE}
+      - N8N_JWT_AUTH_HEADER=${N8N_JWT_AUTH_HEADER}
+      - N8N_JWT_ALGORITHM=${N8N_JWT_ALGORITHM}
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL}
+      - N8N_DATABASE_TYPE=${N8N_DATABASE_TYPE}
+      - N8N_DATABASE_SQLITE_FILE=${N8N_DATABASE_SQLITE_FILE}
+      - N8N_RESET_DATABASE=${N8N_RESET_DATABASE}
+      - N8N_USER_MANAGEMENT_DISABLED=${N8N_USER_MANAGEMENT_DISABLED}
+      - N8N_DISABLE_UI=${N8N_DISABLE_UI}
+    volumes:
+      - n8n_core_data:/home/node/.n8n
+      - n8n_core_files:/files
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - linkedin_core_network
+
+  # Simple Web Interface for Demo
+  web-demo:
+    image: nginx:alpine
+    container_name: linkedin_demo_core
+    restart: unless-stopped
+    ports:
+      - "${WEB_DEMO_EXTERNAL_PORT:-8082}:80"
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+    depends_on:
+      - n8n
+    networks:
+      - linkedin_core_network
+
+volumes:
+  n8n_core_data:
+    driver: local
+  n8n_core_files:
+    driver: local
+  postgres_core_data:
+    driver: local
+
+networks:
+  linkedin_core_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${SUBNET:-172.22.0.0/16}

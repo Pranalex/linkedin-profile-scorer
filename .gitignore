@@ -82,7 +82,6 @@ coverage/
 *password*
 
 # Sensitive development files - never commit these
-docker-compose.yml
 monitoring/
 puppeteer/
 selenium/
@@ -91,7 +90,6 @@ linkedin-mcp/
 mcp-bridge/
 mcp-sse-server/
 sse-proxy/
-web/
 cleanup_all_secrets.py
 remove_secrets.sh
 enhanced-parser.js
