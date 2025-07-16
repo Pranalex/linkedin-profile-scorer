@@ -1,0 +1,692 @@
+{
+  "name": "LinkedIn Profile Scorer - Complete Template",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "analyse-profile",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -500,
+        80
+      ],
+      "id": "webhook-analyse-profile",
+      "name": "Webhook - Analyze Profile",
+      "webhookId": "your-webhook-id-here",
+      "notes": "🔗 WEBHOOK ENDPOINT\n\nThis webhook receives POST requests with LinkedIn profile URLs to analyze.\n\nExpected payload:\n{\n  \"url\": \"linkedin.com/in/username\"\n}\n\nSetup:\n1. Save this workflow first\n2. Copy the webhook URL from the node details\n3. Use this URL in your frontend application"
+    },
+    {
+      "parameters": {
+        "operation": "Run actor",
+        "actorId": {
+          "__rl": true,
+          "value": "VhxlqQXRwhW8H5hNV",
+          "mode": "list",
+          "cachedResultName": "Linkedin Profile Details Scraper + EMAIL (No Cookies Required)",
+          "cachedResultUrl": "https://console.apify.com/actors/VhxlqQXRwhW8H5hNV/input"
+        },
+        "customBody": "={\n\"username\": \"{{ $json.body.url }}\"\n}",
+        "timeout": {},
+        "memory": {},
+        "waitForFinish": 60
+      },
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [
+        -280,
+        80
+      ],
+      "id": "apify-scraper",
+      "name": "Apify - LinkedIn Scraper",
+      "credentials": {
+        "apifyApi": {
+          "id": "YOUR_APIFY_CREDENTIAL_ID",
+          "name": "Apify API"
+        }
+      },
+      "notes": "🕷️ LINKEDIN PROFILE SCRAPER\n\nUses Apify's LinkedIn Profile Scraper to extract profile data.\n\nSetup Required:\n1. Create Apify account at https://apify.com\n2. Get API key from Apify console\n3. Add Apify credential in n8n\n4. This actor ID (VhxlqQXRwhW8H5hNV) is for 'Linkedin Profile Details Scraper + EMAIL (No Cookies Required)'\n\nSettings:\n- Timeout: 60 seconds\n- Wait for finish: Yes\n- Memory: Default\n\nThe scraper extracts:\n- Basic info (name, headline, location)\n- Work experience with dates\n- Education history\n- Skills and endorsements\n- About section\n- Contact information"
+    },
+    {
+      "parameters": {
+        "resource": "Datasets",
+        "operation": "Get items",
+        "datasetId": "={{ $json.defaultDatasetId }}",
+        "offset": {}
+      },
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        80
+      ],
+      "id": "apify-get-results",
+      "name": "Get Scraper Results",
+      "alwaysOutputData": true,
+      "credentials": {
+        "apifyApi": {
+          "id": "YOUR_APIFY_CREDENTIAL_ID",
+          "name": "Apify API"
+        }
+      },
+      "notes": "📊 RETRIEVE SCRAPED DATA\n\nGets the scraped LinkedIn profile data from Apify's dataset.\n\nThis node:\n- Fetches results from the scraper run\n- Always outputs data (even if empty)\n- Passes structured profile data to next nodes\n\nData structure includes:\n- basic_info: name, headline, location, about\n- experience: work history with dates\n- education: degrees and institutions\n- skills: extracted skills and endorsements"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition-profile-found",
+              "leftValue": "={{ $json.message }}",
+              "rightValue": "No profile found or wrong input",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        160,
+        80
+      ],
+      "id": "check-profile-found",
+      "name": "Check Profile Found",
+      "notes": "🔍 PROFILE VALIDATION\n\nChecks if LinkedIn profile was successfully scraped.\n\nFlow:\n- TRUE: Profile found → Continue to scoring\n- FALSE: Profile not found → Return error response\n\nThis prevents processing empty or failed scrapes."
+    },
+    {
+      "parameters": {
+        "jsCode": "// LinkedIn Profile Scorer - Preliminary Analysis\n// This node performs initial rule-based scoring before AI enhancement\n\n// Get the scraped profile data\nconst profileData = $input.first().json;\n\n// Function to create LLM prompt for AI analysis\nfunction createLLMPrompt(profileData) {\n    return `Analyze this LinkedIn profile data and provide structured analysis in JSON format:\n\nPROFILE DATA:\n- Name: ${profileData.basic_info?.fullname || 'Not provided'}\n- Education: ${JSON.stringify(profileData.education || [])}\n- Experience: ${JSON.stringify(profileData.experience?.slice(0, 3) || [])}\n- Current Company: ${profileData.basic_info?.current_company || 'Not provided'}\n- Headline: ${profileData.basic_info?.headline || 'Not provided'}\n- About: ${profileData.basic_info?.about?.substring(0, 500) || 'Not provided'}\n- Creator Hashtags: ${JSON.stringify(profileData.basic_info?.creator_hashtags || [])}\n\nANALYSIS REQUIRED:\n1. Education Level Classification\n2. Industry Classification  \n3. Skills Extraction\n\nRESPONSE FORMAT (JSON ONLY):\n{\n  \"education_analysis\": {\n    \"education_level\": \"bachelor|master|phd|high_school\",\n    \"confidence\": \"high|medium|low\",\n    \"reasoning\": \"Brief explanation\"\n  },\n  \"industry_analysis\": {\n    \"industry\": \"technology|finance|healthcare|other\",\n    \"confidence\": \"high|medium|low\", \n    \"reasoning\": \"Brief explanation\"\n  },\n  \"skills_analysis\": {\n    \"skills\": [\"skill1\", \"skill2\", \"skill3\"],\n    \"confidence\": \"high|medium|low\",\n    \"reasoning\": \"Brief explanation\"\n  }\n}\n\nCLASSIFICATION RULES:\n- Education: PhD/Doctorate=phd, Master's/MBA=master, Bachelor's/University=bachelor, High School/None=high_school\n- Industry: Technology companies/roles=technology, Finance/Banking/Consulting=finance, Healthcare/Medical=healthcare, Others=other\n- Skills: Extract 5-8 most relevant professional skills from all provided data\n\nRespond with JSON only, no additional text.`;\n}\n\n// LinkedIn Profile Scorer Class\nclass LinkedInProfileScorer {\n    constructor() {\n        this.maxScore = 100;\n    }\n\n    scoreProfile(profileData) {\n        const totalExperienceYears = this.extractExperienceYears(profileData);\n        const educationLevel = this.extractEducationLevel(profileData);\n        const industry = this.extractIndustry(profileData);\n\n        const experienceScore = this.calculateExperienceScore(totalExperienceYears);\n        const educationScore = this.calculateEducationScore(educationLevel);\n        const industryScore = this.calculateIndustryScore(industry);\n\n        const totalScore = experienceScore + educationScore + industryScore;\n        const qualificationLevel = this.getQualificationLevel(totalScore);\n\n        return {\n            total_experience_years: totalExperienceYears,\n            education_level: educationLevel,\n            industry: industry,\n            experience_score: experienceScore,\n            education_score: educationScore,\n            industry_score: industryScore,\n            total_score: totalScore,\n            qualification_level: qualificationLevel\n        };\n    }\n\n    extractExperienceYears(profileData) {\n        if (!profileData.experience || profileData.experience.length === 0) {\n            return 0;\n        }\n\n        const currentYear = new Date().getFullYear();\n        let totalMonths = 0;\n\n        profileData.experience.forEach(exp => {\n            const startYear = exp.start_date?.year || currentYear;\n            const endYear = exp.end_date?.year || currentYear;\n            const startMonth = exp.start_date?.month ? this.monthToNumber(exp.start_date.month) : 1;\n            const endMonth = exp.end_date?.month ? this.monthToNumber(exp.end_date.month) : 12;\n\n            const months = (endYear - startYear) * 12 + (endMonth - startMonth);\n            totalMonths += Math.max(months, 0);\n        });\n\n        return Math.round(totalMonths / 12);\n    }\n\n    extractEducationLevel(profileData) {\n        if (!profileData.education || profileData.education.length === 0) {\n            return 'high_school';\n        }\n\n        const degrees = profileData.education.map(edu => {\n            const degree = (edu.degree_name || edu.degree || '').toLowerCase();\n\n            if (degree.includes('phd') || degree.includes('doctorate') || degree.includes('ph.d')) {\n                return 'phd';\n            } else if (degree.includes('master') || degree.includes('mba') || degree.includes('m.s') || degree.includes('m.a')) {\n                return 'master';\n            } else if (degree.includes('bachelor') || degree.includes('b.s') || degree.includes('b.a') || degree.includes('engineer')) {\n                return 'bachelor';\n            } else {\n                return 'high_school';\n            }\n        });\n\n        if (degrees.includes('phd')) return 'phd';\n        if (degrees.includes('master')) return 'master';\n        if (degrees.includes('bachelor')) return 'bachelor';\n        return 'high_school';\n    }\n\n    extractIndustry(profileData) {\n        const currentExperience = profileData.experience?.find(exp => exp.is_current);\n        const company = currentExperience?.company?.toLowerCase() || '';\n        const title = (profileData.basic_info?.headline || currentExperience?.title || '').toLowerCase();\n        const about = (profileData.basic_info?.about || '').toLowerCase();\n\n        const combinedText = `${company} ${title} ${about}`;\n\n        const techKeywords = ['software', 'developer', 'engineer', 'tech', 'programming', 'coding', 'javascript', 'python', 'react', 'ai', 'machine learning', 'data science', 'startup', 'saas', 'cloud', 'aws', 'google', 'microsoft', 'apple', 'meta', 'uber', 'airbnb'];\n        const financeKeywords = ['finance', 'investment', 'banking', 'financial', 'consulting', 'mckinsey', 'bain', 'bcg', 'goldman sachs', 'jp morgan', 'morgan stanley', 'analyst', 'advisor', 'capital', 'fund'];\n        const healthcareKeywords = ['healthcare', 'medical', 'doctor', 'nurse', 'hospital', 'pharma', 'biotech', 'education', 'teacher', 'professor', 'university', 'school', 'research'];\n\n        if (techKeywords.some(keyword => combinedText.includes(keyword))) {\n            return 'technology';\n        } else if (financeKeywords.some(keyword => combinedText.includes(keyword))) {\n            return 'finance';\n        } else if (healthcareKeywords.some(keyword => combinedText.includes(keyword))) {\n            return 'healthcare';\n        } else {\n            return 'other';\n        }\n    }\n\n    calculateExperienceScore(years) {\n        if (years >= 11) return 40;\n        if (years >= 6) return 30;\n        if (years >= 3) return 20;\n        if (years >= 1) return 10;\n        return 0;\n    }\n\n    calculateEducationScore(level) {\n        switch (level) {\n            case 'phd': return 30;\n            case 'master': return 25;\n            case 'bachelor': return 15;\n            case 'high_school': return 5;\n            default: return 0;\n        }\n    }\n\n    calculateIndustryScore(industry) {\n        switch (industry) {\n            case 'technology': return 30;\n            case 'finance': return 25;\n            case 'healthcare': return 20;\n            case 'other': return 10;\n            default: return 0;\n        }\n    }\n\n    getQualificationLevel(score) {\n        if (score >= 80) return 'excellent';\n        if (score >= 60) return 'good';\n        if (score >= 40) return 'average';\n        if (score >= 20) return 'poor';\n        return 'unqualified';\n    }\n\n    monthToNumber(month) {\n        const months = {\n            'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,\n            'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12\n        };\n        return months[month.toLowerCase().substring(0, 3)] || 1;\n    }\n}\n\n// Create scorer and process the profile\nconst scorer = new LinkedInProfileScorer();\nconst scoringResults = scorer.scoreProfile(profileData);\n\n// Create LLM prompt for AI analysis\nconst llmPrompt = createLLMPrompt(profileData);\n\n// Enhanced skills extraction\nconst skills = [];\n\nif (profileData.basic_info?.creator_hashtags) {\n    profileData.basic_info.creator_hashtags.forEach(tag => {\n        if (!skills.includes(tag)) {\n            skills.push(tag);\n        }\n    });\n}\n\nconst headline = (profileData.basic_info?.headline || '').toLowerCase();\nlet about = (profileData.basic_info?.about || '').toLowerCase();\nlet combinedText = `${headline} ${about}`;\n\nif (profileData.experience) {\n    profileData.experience.forEach(exp => {\n        if (exp.description) {\n            const desc = exp.description.toLowerCase();\n            combinedText += ` ${desc}`;\n        }\n        if (exp.title) {\n            combinedText += ` ${exp.title.toLowerCase()}`;\n        }\n    });\n}\n\nconst skillKeywords = {\n    'technology': ['javascript', 'python', 'react', 'ai', 'artificial intelligence', 'machine learning', 'data science', 'cloud', 'aws', 'azure', 'software', 'programming', 'coding', 'development', 'innovation'],\n    'leadership': ['leadership', 'management', 'strategy', 'ceo', 'founder', 'co-founder', 'chair', 'chairman', 'executive', 'director'],\n    'finance': ['finance', 'investment', 'banking', 'financial', 'funding', 'capital', 'venture', 'equity', 'portfolio'],\n    'healthcare': ['healthcare', 'medical', 'health', 'biotech', 'pharma', 'research', 'science', 'clinical'],\n    'sustainability': ['sustainability', 'climate', 'environment', 'energy', 'renewable', 'green', 'carbon'],\n    'education': ['education', 'teaching', 'learning', 'university', 'school', 'foundation', 'nonprofit', 'philanthropy'],\n    'communication': ['communication', 'writing', 'blogger', 'speaking', 'presentation', 'media', 'books', 'reading']\n};\n\nObject.keys(skillKeywords).forEach(skillCategory => {\n    skillKeywords[skillCategory].forEach(keyword => {\n        if (combinedText.includes(keyword) && !skills.includes(skillCategory)) {\n            skills.push(skillCategory);\n        }\n    });\n});\n\nconst specificSkills = ['books', 'healthcare', 'innovation', 'climatechange', 'sustainability', 'philanthropy', 'entrepreneurship', 'investing'];\nspecificSkills.forEach(skill => {\n    if (combinedText.includes(skill.toLowerCase()) && !skills.includes(skill)) {\n        skills.push(skill);\n    }\n});\n\nconst finalSkills = skills.slice(0, 10);\n\n// FIXED: Enhanced current_position extraction with company context\nconst currentPosition = (() => {\n    const currentExp = profileData.experience?.find(exp => exp.is_current);\n    const title = currentExp?.title;\n    const company = currentExp?.company || profileData.basic_info?.current_company;\n    \n    if (title && company) {\n        return `${title} at ${company}`;\n    }\n    return title || profileData.basic_info?.headline || null;\n})();\n\nreturn [\n    {\n        json: {\n            llm_prompt: llmPrompt,\n            linkedin_url: $('Webhook - Analyze Profile').first().json.body.url || null,\n            full_name: profileData.basic_info?.fullname || null,\n            current_position: currentPosition,\n            current_company: profileData.basic_info?.current_company || null,\n            location: profileData.basic_info?.location?.full || null,\n            total_experience_years: scoringResults.total_experience_years,\n            education_level: scoringResults.education_level,\n            industry: scoringResults.industry,\n            skills: finalSkills,\n            summary: profileData.basic_info?.about || null,\n            experience_score: scoringResults.experience_score,\n            education_score: scoringResults.education_score,\n            industry_score: scoringResults.industry_score,\n            total_score: scoringResults.total_score,\n            qualification_level: scoringResults.qualification_level,\n            processed_at: new Date().toISOString()\n        }\n    }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        -20
+      ],
+      "id": "preliminary-scoring",
+      "name": "Preliminary Scoring",
+      "notes": "🎯 PRELIMINARY SCORING ENGINE\n\nPerforms initial rule-based analysis of LinkedIn profile data.\n\nSCORING SYSTEM (100 points total):\n\n📊 EXPERIENCE (40 points max):\n- 11+ years: 40 points\n- 6-10 years: 30 points\n- 3-5 years: 20 points\n- 1-2 years: 10 points\n- 0 years: 0 points\n\n🎓 EDUCATION (30 points max):\n- PhD/Doctorate: 30 points\n- Master's/MBA: 25 points\n- Bachelor's: 15 points\n- High School: 5 points\n\n🏭 INDUSTRY (30 points max):\n- Technology: 30 points\n- Finance: 25 points\n- Healthcare: 20 points\n- Other: 10 points\n\n🔧 FEATURES:\n- Extracts experience years from date ranges\n- Classifies education level from degree names\n- Identifies industry from job titles and descriptions\n- Extracts skills from profile text and hashtags\n- Creates AI prompt for enhanced analysis\n- FIXED: Enhanced position extraction with company context\n\nThis data is then sent to AI for enhancement and refinement."
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        688,
+        200
+      ],
+      "id": "gemini-model",
+      "name": "Google Gemini AI",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YOUR_GOOGLE_GEMINI_CREDENTIAL_ID",
+          "name": "Google Gemini API"
+        }
+      },
+      "notes": "🤖 GOOGLE GEMINI AI MODEL\n\nProvides the AI language model for enhanced analysis.\n\nSetup Required:\n1. Get Google AI Studio API key from https://makersuite.google.com/app/apikey\n2. Add Google Gemini credential in n8n\n3. Enter your API key\n\nModel Settings:\n- Model: gemini-2.5-flash (fast and cost-effective)\n- Temperature: 0.1 (focused, deterministic responses)\n\nThis model is connected to the LLM Chain node for processing."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.llm_prompt }}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        600,
+        -20
+      ],
+      "id": "ai-analysis-chain",
+      "name": "AI Analysis Chain",
+      "notes": "🔗 AI ANALYSIS CHAIN\n\nProcesses the LLM prompt through Google Gemini for enhanced analysis.\n\nThis node:\n- Takes the structured prompt from Preliminary Scoring\n- Sends it to Google Gemini AI\n- Returns enhanced analysis for education, industry, and skills\n- Provides confidence levels and reasoning\n\nAI Enhancement:\n- Better education level detection\n- More accurate industry classification\n- Improved skills extraction\n- Confidence scoring\n- Reasoning explanations\n\nThe AI analysis is then combined with rule-based scoring in the next node."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Enhanced Score Code - AI-Powered Analysis Integration\n// Combines rule-based scoring with Google Gemini AI analysis\n\n// Get LLM results and original profile data\nconst geminiResponse = $('AI Analysis Chain').first().json;\nconst originalData = $('Preliminary Scoring').first().json;\n\n// Parse Gemini response with robust error handling\nlet llmAnalysis = {};\ntry {\n    const responseText = geminiResponse.message || geminiResponse.text || geminiResponse.response;\n    \n    // Clean up response format (remove markdown code blocks)\n    const cleanedResponse = responseText.replace(/```json|```/g, '').trim();\n    \n    llmAnalysis = JSON.parse(cleanedResponse);\n    \n    // Validate structure\n    if (!llmAnalysis.education_analysis || !llmAnalysis.industry_analysis || !llmAnalysis.skills_analysis) {\n        throw new Error('Invalid AI response structure');\n    }\n    \n} catch (error) {\n    console.log('Gemini parsing failed, using fallback analysis:', error.message);\n    llmAnalysis = null;\n}\n\n// Enhanced extraction functions with AI integration\nfunction getEnhancedEducation(originalLevel, llmResult) {\n    if (llmResult && \n        llmResult.education_analysis && \n        llmResult.education_analysis.confidence !== 'low') {\n        \n        const aiLevel = llmResult.education_analysis.education_level;\n        \n        // Validation: AI result must be valid option\n        const validLevels = ['phd', 'master', 'bachelor', 'high_school'];\n        if (validLevels.includes(aiLevel)) {\n            return aiLevel;\n        }\n    }\n    return originalLevel;\n}\n\nfunction getEnhancedIndustry(originalIndustry, llmResult) {\n    if (llmResult && \n        llmResult.industry_analysis && \n        llmResult.industry_analysis.confidence !== 'low') {\n        \n        const aiIndustry = llmResult.industry_analysis.industry;\n        \n        // Validation: AI result must be valid option\n        const validIndustries = ['technology', 'finance', 'healthcare', 'other'];\n        if (validIndustries.includes(aiIndustry)) {\n            return aiIndustry;\n        }\n    }\n    return originalIndustry;\n}\n\nfunction getEnhancedSkills(originalSkills, llmResult) {\n    if (llmResult && \n        llmResult.skills_analysis && \n        llmResult.skills_analysis.confidence !== 'low' &&\n        Array.isArray(llmResult.skills_analysis.skills)) {\n        \n        const aiSkills = llmResult.skills_analysis.skills;\n        \n        // Combine AI skills with original skills, removing duplicates\n        const combinedSkills = [...new Set([...aiSkills, ...originalSkills])];\n        \n        // Limit to top 10 skills\n        return combinedSkills.slice(0, 10);\n    }\n    return originalSkills;\n}\n\n// Apply AI enhancements\nconst enhancedEducation = getEnhancedEducation(originalData.education_level, llmAnalysis);\nconst enhancedIndustry = getEnhancedIndustry(originalData.industry, llmAnalysis);\nconst enhancedSkills = getEnhancedSkills(originalData.skills, llmAnalysis);\n\n// Recalculate scores with enhanced data\nfunction calculateEducationScore(level) {\n    const scoreMap = {\n        'phd': 30,           // PhD/Doctorate: Maximum points\n        'master': 25,        // Master's/MBA: High points\n        'bachelor': 15,      // Bachelor's: Medium points\n        'high_school': 5     // High School: Minimum points\n    };\n    return scoreMap[level] || 0;\n}\n\nfunction calculateIndustryScore(industry) {\n    const scoreMap = {\n        'technology': 30,    // Technology: Highest relevance\n        'finance': 25,       // Finance: High relevance\n        'healthcare': 20,    // Healthcare: Medium relevance\n        'other': 10          // Other: Lower relevance\n    };\n    return scoreMap[industry] || 0;\n}\n\nfunction getQualificationLevel(score) {\n    if (score >= 80) return 'excellent';      // 80-100: Top tier\n    if (score >= 60) return 'good';           // 60-79: Strong candidate\n    if (score >= 40) return 'average';        // 40-59: Average candidate\n    if (score >= 20) return 'poor';           // 20-39: Below average\n    return 'unqualified';                     // 0-19: Not qualified\n}\n\n// Calculate final scores\nconst enhancedEducationScore = calculateEducationScore(enhancedEducation);\nconst enhancedIndustryScore = calculateIndustryScore(enhancedIndustry);\nconst enhancedTotalScore = originalData.experience_score + enhancedEducationScore + enhancedIndustryScore;\nconst enhancedQualificationLevel = getQualificationLevel(enhancedTotalScore);\n\n// Generate analysis summary for transparency\nconst analysisSummary = {\n    ai_used: llmAnalysis !== null,\n    education_enhanced: enhancedEducation !== originalData.education_level,\n    industry_enhanced: enhancedIndustry !== originalData.industry,\n    skills_enhanced: enhancedSkills.length !== originalData.skills.length,\n    score_improvement: enhancedTotalScore - originalData.total_score,\n    confidence_levels: llmAnalysis ? {\n        education: llmAnalysis.education_analysis?.confidence,\n        industry: llmAnalysis.industry_analysis?.confidence,\n        skills: llmAnalysis.skills_analysis?.confidence\n    } : null\n};\n\n// Return comprehensive enhanced results\nreturn [\n    {\n        json: {\n            // Basic profile information\n            linkedin_url: originalData.linkedin_url,\n            full_name: originalData.full_name,\n            current_position: originalData.current_position,\n            current_company: originalData.current_company,\n            location: originalData.location,\n            summary: originalData.summary,\n            \n            // Enhanced metrics\n            total_experience_years: originalData.total_experience_years,\n            education_level: enhancedEducation,\n            industry: enhancedIndustry,\n            skills: enhancedSkills,\n            \n            // Updated scoring\n            experience_score: originalData.experience_score,\n            education_score: enhancedEducationScore,\n            industry_score: enhancedIndustryScore,\n            total_score: enhancedTotalScore,\n            qualification_level: enhancedQualificationLevel,\n            \n            // AI analysis transparency\n            llm_education_reasoning: llmAnalysis?.education_analysis?.reasoning || 'Fallback rule-based analysis used',\n            llm_industry_reasoning: llmAnalysis?.industry_analysis?.reasoning || 'Fallback rule-based analysis used',\n            llm_skills_reasoning: llmAnalysis?.skills_analysis?.reasoning || 'Fallback rule-based analysis used',\n            llm_education_confidence: llmAnalysis?.education_analysis?.confidence || 'unknown',\n            llm_industry_confidence: llmAnalysis?.industry_analysis?.confidence || 'unknown',\n            llm_skills_confidence: llmAnalysis?.skills_analysis?.confidence || 'unknown',\n            llm_analysis_status: llmAnalysis ? 'success' : 'fallback',\n            \n            // Analysis summary\n            analysis_summary: analysisSummary,\n            \n            // Metadata\n            processed_at: new Date().toISOString(),\n            processing_version: '2.0_ai_enhanced'\n        }\n    }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        -20
+      ],
+      "id": "enhanced-scoring",
+      "name": "Enhanced Scoring",
+      "notes": "🚀 ENHANCED SCORING ENGINE\n\nCombines rule-based scoring with AI analysis for superior accuracy.\n\nAI ENHANCEMENTS:\n\n🎓 Education Analysis:\n- AI better detects degree levels from descriptions\n- Handles international degrees and certifications\n- Provides confidence levels and reasoning\n\n🏭 Industry Classification:\n- AI understands context and nuanced job descriptions\n- Better classification of mixed-industry roles\n- Handles emerging industries and job titles\n\n🔧 Skills Enhancement:\n- AI extracts skills from natural language descriptions\n- Identifies implied skills from job responsibilities\n- Combines with rule-based keyword extraction\n\n📊 ROBUST PROCESSING:\n- Graceful fallback to rule-based analysis if AI fails\n- Validation of AI responses\n- Confidence scoring for each enhancement\n- Transparency in AI vs rule-based decisions\n\nRESULT:\n- More accurate scoring\n- Better profile understanding\n- Detailed reasoning for decisions\n- Confidence levels for each metric\n\nThis enhanced data is then stored in databases and returned to the user."
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1196,
+        -220
+      ],
+      "id": "success-response",
+      "name": "Success Response",
+      "notes": "✅ SUCCESS RESPONSE\n\nReturns the complete analysis results to the web interface.\n\nResponse includes:\n- All profile information\n- Scoring breakdown\n- AI analysis results\n- Confidence levels\n- Reasoning explanations\n- Processing metadata\n\nThis is the final output sent back to your frontend application."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n    \"success\": false,\n    \"error\": {\n      \"code\": \"PROFILE_NOT_FOUND\",\n      \"message\": \"{{ $json.message || 'LinkedIn profile not found or URL is invalid' }}\",\n      \"details\": \"The provided LinkedIn URL does not exist, is private, or is not accessible. Please check the URL and try again.\"\n    }\n  }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        380,
+        180
+      ],
+      "id": "error-response",
+      "name": "Error Response",
+      "notes": "❌ ERROR RESPONSE\n\nReturns structured error response when profile cannot be found.\n\nCommon causes:\n- Invalid LinkedIn URL\n- Private profile\n- Profile doesn't exist\n- LinkedIn blocking/rate limiting\n- Network issues\n\nError format:\n{\n  \"success\": false,\n  \"error\": {\n    \"code\": \"PROFILE_NOT_FOUND\",\n    \"message\": \"Description of the issue\",\n    \"details\": \"Additional context\"\n  }\n}"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO profiles (\n    id,\n    linkedin_url,\n    full_name,\n    current_position,\n    current_company,\n    location,\n    total_experience_years,\n    education_level,\n    industry,\n    skills,\n    experience_score,\n    education_score,\n    industry_score,\n    total_score,\n    qualification_level,\n    processing_status,\n    created_at,\n    updated_at\n) VALUES (\n    gen_random_uuid(),\n    '{{ $json.linkedin_url }}',\n    '{{ $json.full_name.replace(/'/g, \"''\") }}',\n    '{{ $json.current_position.replace(/'/g, \"''\") }}',\n    '{{ $json.current_company.replace(/'/g, \"''\") }}',\n    '{{ $json.location.replace(/'/g, \"''\") }}',\n    {{ $json.total_experience_years }},\n    '{{ $json.education_level }}',\n    '{{ $json.industry }}',\n    '{{ JSON.stringify($json.skills) }}'::jsonb,\n    {{ $json.experience_score }},\n    {{ $json.education_score }},\n    {{ $json.industry_score }},\n    {{ $json.total_score }},\n    '{{ $json.qualification_level }}',\n    'completed',\n    CURRENT_TIMESTAMP,\n    CURRENT_TIMESTAMP\n)\nON CONFLICT (linkedin_url)\nDO UPDATE SET\n    full_name = EXCLUDED.full_name,\n    current_position = EXCLUDED.current_position,\n    current_company = EXCLUDED.current_company,\n    location = EXCLUDED.location,\n    total_experience_years = EXCLUDED.total_experience_years,\n    education_level = EXCLUDED.education_level,\n    industry = EXCLUDED.industry,\n    skills = EXCLUDED.skills,\n    experience_score = EXCLUDED.experience_score,\n    education_score = EXCLUDED.education_score,\n    industry_score = EXCLUDED.industry_score,\n    total_score = EXCLUDED.total_score,\n    qualification_level = EXCLUDED.qualification_level,\n    processing_status = 'completed',\n    updated_at = CURRENT_TIMESTAMP;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1196,
+        -20
+      ],
+      "id": "postgres-storage",
+      "name": "PostgreSQL Storage",
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "PostgreSQL Database"
+        }
+      },
+      "notes": "🗄️ POSTGRESQL STORAGE\n\nStores profile analysis results in PostgreSQL database.\n\nSetup Required:\n1. Install PostgreSQL\n2. Create database named 'linkedin_profiles'\n3. Create credentials in n8n with connection details\n4. Run the SQL schema from the repository\n\nDatabase Schema:\n- profiles table with all scoring fields\n- JSONB skills storage for flexible querying\n- UPSERT logic (INSERT or UPDATE if exists)\n- Timestamps for created/updated tracking\n\nSQL Features:\n- Conflict resolution by linkedin_url\n- Automatic UUID generation\n- Proper escaping for SQL injection protection\n- JSONB for skills array storage\n\nThis enables:\n- Analytics and reporting\n- Historical tracking\n- Bulk operations\n- Performance monitoring"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_DATABASE_ID",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Full Name|title",
+              "title": "={{ $json.full_name }}"
+            },
+            {
+              "key": "LinkedIn URL|url",
+              "urlValue": "={{ $json.linkedin_url }}"
+            },
+            {
+              "key": "Current Position|rich_text",
+              "richText": true,
+              "text": {
+                "text": [
+                  {
+                    "text": "={{ $json.current_position }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            },
+            {
+              "key": "Current Company|rich_text",
+              "richText": true,
+              "text": {
+                "text": [
+                  {
+                    "text": "={{ $json.current_company }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            },
+            {
+              "key": "Location|rich_text",
+              "richText": true,
+              "text": {
+                "text": [
+                  {
+                    "text": "={{ $json.location }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            },
+            {
+              "key": "Experience Years|number",
+              "numberValue": "={{ $json.total_experience_years }}"
+            },
+            {
+              "key": "Education Level|select",
+              "selectValue": "={{ $json.education_level }}"
+            },
+            {
+              "key": "Industry|select",
+              "selectValue": "={{ $json.industry }}"
+            },
+            {
+              "key": "Skills|multi_select",
+              "multiSelectValue": "={{ $json.skills }}"
+            },
+            {
+              "key": "Summary|rich_text",
+              "richText": true,
+              "text": {
+                "text": [
+                  {
+                    "text": "={{ $json.summary }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            },
+            {
+              "key": "Experience Score|number",
+              "numberValue": "={{ $json.experience_score }}"
+            },
+            {
+              "key": "Education Score|number",
+              "numberValue": "={{ $json.education_score }}"
+            },
+            {
+              "key": "Industry Score|number",
+              "numberValue": "={{ $json.industry_score }}"
+            },
+            {
+              "key": "Total Score|number",
+              "numberValue": "={{ $json.total_score }}"
+            },
+            {
+              "key": "Qualification Level|select",
+              "selectValue": "={{ $json.qualification_level }}"
+            },
+            {
+              "key": "Processed At|date",
+              "includeTime": true,
+              "date": "={{ $json.processed_at }}"
+            },
+            {
+              "key": "LLM Education Reasoning|rich_text",
+              "richText": true,
+              "text": {
+                "text": [
+                  {
+                    "text": "={{ $json.llm_education_reasoning }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            },
+            {
+              "key": "LLM Industry Reasoning|rich_text",
+              "richText": true,
+              "text": {
+                "text": [
+                  {
+                    "text": "={{ $json.llm_industry_reasoning }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            },
+            {
+              "key": "LLM Skills Reasoning|rich_text",
+              "richText": true,
+              "text": {
+                "text": [
+                  {
+                    "text": "={{ $json.llm_skills_reasoning }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            },
+            {
+              "key": "LLM Education Confidence|select",
+              "selectValue": "={{ $json.llm_education_confidence }}"
+            },
+            {
+              "key": "LLM Industry Confidence|select",
+              "selectValue": "={{ $json.llm_industry_confidence }}"
+            },
+            {
+              "key": "LLM Skills Confidence|select",
+              "selectValue": "={{ $json.llm_skills_confidence }}"
+            },
+            {
+              "key": "LLM Analysis Status|select",
+              "selectValue": "={{ $json.llm_analysis_status }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1636,
+        280
+      ],
+      "id": "notion-create-page",
+      "name": "Create Notion Page",
+      "retryOnFail": false,
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CREDENTIAL_ID",
+          "name": "Notion API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "📝 NOTION DATABASE INTEGRATION\n\nCreates a new page in Notion database with profile analysis.\n\nSetup Required:\n1. Create Notion integration at https://www.notion.so/my-integrations\n2. Create database with all the required properties\n3. Share database with your integration\n4. Add Notion credential in n8n\n5. Replace YOUR_NOTION_DATABASE_ID with actual database ID\n\nDatabase Properties Required:\n- Full Name (Title)\n- LinkedIn URL (URL)\n- Current Position (Rich Text)\n- Current Company (Rich Text)\n- Location (Rich Text)\n- Experience Years (Number)\n- Education Level (Select: high_school, bachelor, master, phd)\n- Industry (Select: technology, finance, healthcare, other)\n- Skills (Multi-select)\n- Summary (Rich Text)\n- Experience Score (Number)\n- Education Score (Number)\n- Industry Score (Number)\n- Total Score (Number)\n- Qualification Level (Select: unqualified, poor, average, good, excellent)\n- Processed At (Date)\n- LLM Education Reasoning (Rich Text)\n- LLM Industry Reasoning (Rich Text)\n- LLM Skills Reasoning (Rich Text)\n- LLM Education Confidence (Select: high, medium, low, unknown)\n- LLM Industry Confidence (Select: high, medium, low, unknown)\n- LLM Skills Confidence (Select: high, medium, low, unknown)\n- LLM Analysis Status (Select: success, fallback)\n\nThis creates a collaborative workspace for team review and analysis."
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_DATABASE_ID",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "simple": false,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "LinkedIn URL|url",
+              "condition": "equals",
+              "urlValue": "={{ $json.linkedin_url }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1196,
+        180
+      ],
+      "id": "notion-check-existing",
+      "name": "Check Existing Notion Page",
+      "alwaysOutputData": true,
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CREDENTIAL_ID",
+          "name": "Notion API"
+        }
+      },
+      "notes": "🔍 CHECK EXISTING NOTION PAGE\n\nChecks if a profile already exists in Notion database.\n\nThis node:\n- Searches for existing page by LinkedIn URL\n- Returns page ID if found\n- Returns empty if not found\n- Always outputs data for next node decision\n\nUse Case:\n- Prevents duplicate pages\n- Enables update vs create logic\n- Maintains data integrity\n\nNext Node Decision:\n- If page exists → Update existing page\n- If page doesn't exist → Create new page"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-page-exists",
+              "leftValue": "={{ $json.id ? 1 : 0 }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1416,
+        180
+      ],
+      "id": "check-notion-page-exists",
+      "name": "Page Exists?",
+      "notes": "🔄 NOTION PAGE EXISTS CHECK\n\nDecides whether to update existing page or create new one.\n\nLogic:\n- TRUE: Page exists → Update existing page\n- FALSE: Page doesn't exist → Create new page\n\nThis ensures:\n- No duplicate pages\n- Updated information for existing profiles\n- Clean database structure"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Full Name|title",
+              "title": "={{ $('Enhanced Scoring').item.json.full_name }}"
+            },
+            {
+              "key": "Current Position|rich_text",
+              "richText": true,
+              "text": {
+                "text": [
+                  {
+                    "text": "={{ $('Enhanced Scoring').item.json.current_position }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            },
+            {
+              "key": "Total Score|number",
+              "numberValue": "={{ $('Enhanced Scoring').item.json.total_score }}"
+            },
+            {
+              "key": "Qualification Level|select",
+              "selectValue": "={{ $('Enhanced Scoring').item.json.qualification_level }}"
+            },
+            {
+              "key": "Processed At|date",
+              "includeTime": true,
+              "date": "={{ $('Enhanced Scoring').item.json.processed_at }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1636,
+        80
+      ],
+      "id": "notion-update-page",
+      "name": "Update Notion Page",
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CREDENTIAL_ID",
+          "name": "Notion API"
+        }
+      },
+      "notes": "📝 UPDATE EXISTING NOTION PAGE\n\nUpdates existing Notion page with latest analysis results.\n\nThis node:\n- Updates key fields that might change\n- Preserves existing data\n- Updates timestamp\n- Maintains page history\n\nUpdated Fields:\n- Full Name (in case of name changes)\n- Current Position (job changes)\n- Total Score (scoring improvements)\n- Qualification Level (level changes)\n- Processed At (analysis timestamp)\n\nBenefit:\n- Maintains single source of truth\n- Tracks changes over time\n- Keeps team collaboration context\n- Avoids duplicate pages"
+    }
+  ],
+  "connections": {
+    "Webhook - Analyze Profile": {
+      "main": [
+        [
+          {
+            "node": "Apify - LinkedIn Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify - LinkedIn Scraper": {
+      "main": [
+        [
+          {
+            "node": "Get Scraper Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Scraper Results": {
+      "main": [
+        [
+          {
+            "node": "Check Profile Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Profile Found": {
+      "main": [
+        [
+          {
+            "node": "Preliminary Scoring",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preliminary Scoring": {
+      "main": [
+        [
+          {
+            "node": "AI Analysis Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini AI": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Analysis Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Analysis Chain": {
+      "main": [
+        [
+          {
+            "node": "Enhanced Scoring",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Scoring": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PostgreSQL Storage",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Existing Notion Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Existing Notion Page": {
+      "main": [
+        [
+          {
+            "node": "Page Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Page Exists?": {
+      "main": [
+        [
+          {
+            "node": "Update Notion Page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Notion Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "template-instance-id"
+  },
+  "tags": ["linkedin", "ai", "scoring", "profile-analysis", "template"]
+}

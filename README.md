@@ -9,10 +9,10 @@ Intelligent LinkedIn profile analysis and scoring system using n8n automation, A
 git clone <repository-url>
 cd linkedin-profile-scorer
 
-# Import n8n workflow
+# Import n8n workflow template
 # 1. Open your n8n instance
-# 2. Import workflows/linkedin-profile-scorer-template.json
-# 3. Configure credentials (see Setup Guide)
+# 2. Import workflow-templates/LinkedIn_Profile_Scorer_Complete_Template.json
+# 3. Configure credentials (see workflow-templates/README.md)
 
 # Test the system
 curl -X POST https://your-n8n-instance/webhook/analyse-profile \
@@ -282,17 +282,24 @@ const results = scorer.scoreProfile(profileData);
 
 ## 🚀 Setup Instructions
 
-### 1. Prerequisites
+### 1. Complete Workflow Template
+For a comprehensive, production-ready implementation, use the complete workflow template:
+
+- **Template**: `workflow-templates/LinkedIn_Profile_Scorer_Complete_Template.json`
+- **Documentation**: `workflow-templates/README.md`
+- **Quick Start**: `workflow-templates/QUICK_START.md`
+
+### 2. Prerequisites
 - n8n instance (self-hosted or cloud)
 - PostgreSQL database (v12+)
-- Notion workspace with API access
+- Notion workspace with API access (optional)
 - Apify account with LinkedIn scraper access
 - Google AI Studio account for Gemini API
 
-### 2. Import n8n Workflow
+### 3. Import n8n Workflow
 ```bash
-# 1. Download the workflow template
-curl -O https://raw.githubusercontent.com/your-repo/linkedin-profile-scorer/main/workflows/linkedin-profile-scorer-template.json
+# 1. Download the complete template
+curl -O https://raw.githubusercontent.com/your-repo/linkedin-profile-scorer/main/workflow-templates/LinkedIn_Profile_Scorer_Complete_Template.json
 
 # 2. Import to n8n
 # - Open n8n interface
@@ -300,21 +307,21 @@ curl -O https://raw.githubusercontent.com/your-repo/linkedin-profile-scorer/main
 # - Select the downloaded JSON file
 ```
 
-### 3. Configure Credentials
+### 4. Configure Credentials
 ```bash
 # In n8n, create these credentials:
 # - Apify: API token from apify.com account
 # - PostgreSQL: Database connection details  
-# - Notion: Integration token from notion.so/my-integrations
+# - Notion: Integration token from notion.so/my-integrations (optional)
 # - Google Gemini: API key from Google AI Studio
 ```
 
-### 4. Update Node Configuration
+### 5. Update Node Configuration
 - **Notion Database ID**: Update in "Get many database pages" and "Create a database page" nodes
-- **Webhook URL**: Note the webhook URL from "analyse-profile1" node
-- **Database Schema**: Run `database/postgresql-schema.sql` on your PostgreSQL instance
+- **Webhook URL**: Note the webhook URL from "analyse-profile" node
+- **Database Schema**: See `workflow-templates/README.md` for complete schema
 
-### 5. Test the System
+### 6. Test the System
 ```bash
 # Test with a public LinkedIn profile
 curl -X POST https://your-n8n-instance/webhook/analyse-profile \
@@ -346,11 +353,11 @@ console.log(results.qualification_level); // excellent/good/average/poor/unquali
 
 ## 📚 Documentation
 
-- [Complete Setup Guide](docs/setup-guide.md) - Detailed configuration instructions
-- [Workflow Documentation](workflows/workflow-documentation.md) - n8n workflow details
-- [Security Guide](docs/security-guide.md) - Security best practices
+- [Complete Workflow Template](workflow-templates/LinkedIn_Profile_Scorer_Complete_Template.json) - Production-ready n8n workflow
+- [Template Documentation](workflow-templates/README.md) - Comprehensive setup guide
+- [Quick Start Guide](workflow-templates/QUICK_START.md) - 15-minute deployment guide
+- [JavaScript Scorer](scoring/linkedin_profile_scorer.js) - Standalone scoring engine
 - [Database Schema](database/postgresql-schema.sql) - Complete database structure
-- [Notion Properties](database/notion-properties.md) - Notion database configuration
 
 ## 📈 Performance & Benchmarks
 
