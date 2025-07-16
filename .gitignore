@@ -81,6 +81,22 @@ coverage/
 *secret*
 *password*
 
+# Sensitive development files - never commit these
+docker-compose.yml
+monitoring/
+puppeteer/
+selenium/
+sql/
+linkedin-mcp/
+mcp-bridge/
+mcp-sse-server/
+sse-proxy/
+web/
+cleanup_all_secrets.py
+remove_secrets.sh
+enhanced-parser.js
+precise-html-parser.js
+
 # Backup files
 *.bak
 *.backup
