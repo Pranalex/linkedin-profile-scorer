@@ -263,7 +263,16 @@ return [
             llm_prompt: llmPrompt,
             linkedin_url: $('analyse-profile1').first().json.body.url || null,
             full_name: profileData.basic_info?.fullname || null,
-            current_position: profileData.experience?.find(exp => exp.is_current)?.title || profileData.basic_info?.headline || null,
+            current_position: (() => {
+                const currentExp = profileData.experience?.find(exp => exp.is_current);
+                const title = currentExp?.title;
+                const company = currentExp?.company || profileData.basic_info?.current_company;
+                
+                if (title && company) {
+                    return `${title} at ${company}`;
+                }
+                return title || profileData.basic_info?.headline || null;
+            })(),
             current_company: profileData.basic_info?.current_company || null,
             location: profileData.basic_info?.location?.full || null,
             total_experience_years: scoringResults.total_experience_years,
@@ -285,10 +294,12 @@ return [
  * n8n Code Node Implementation
  * This is the complete preliminary score code for the n8n workflow
  * 
- * FIXED: current_position now correctly extracts job title from experience
- * instead of using the headline (bio/summary)
+ * ENHANCED: current_position now correctly extracts job title from experience
+ * and includes company name for better context
  * 
- * Key Fix:
- * - Line 285: current_position: profileData.experience?.find(exp => exp.is_current)?.title || profileData.basic_info?.headline || null,
- * - This ensures actual job title is used instead of LinkedIn bio/summary
+ * Key Enhancements:
+ * - Line 266-275: Enhanced position logic that combines title and company
+ * - Format: "Co-Founder at AYOMI.fr" instead of just "Co-Founder"
+ * - Fallback: title only → headline → null
+ * - This ensures actual job title with company context instead of LinkedIn bio/summary
  */
